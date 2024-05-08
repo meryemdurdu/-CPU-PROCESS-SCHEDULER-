@@ -22,6 +22,8 @@ void read_input_file(const char *filename, Process *processes, int *num_processe
 void assign_processes(Process *processes, int num_processes, FILE *output_file);
 void print_cpu_queues(Process *processes, int num_processes);
 
+void sort_processes_by_burst_time(Process *queue, int count);
+
 int main(int argc, char *argv[]) {
     if (argc != 2) {
         printf("Usage: %s input.txt\n", argv[0]);
@@ -90,6 +92,31 @@ void assign_processes(Process *processes, int num_processes, FILE *output_file) 
             // Assign to appropriate queue and execute based on priority and scheduling algorithm
             // Process execution...
             fprintf(output_file, "Process %s is completed and terminated.\n", processes[i].name);
+        }
+    }
+}
+
+//Helper function to sort processes by burst_time for SJF scheduling
+void sort_processes_by_burst_time(Process *queue, int count) {
+    int i, j, min_idx;
+
+    // Selection sort algorithm
+    for (i = 0; i < count - 1; i++) {
+        // Get current index as min index
+        min_idx = i;
+
+        // Compare elemnts until there is a smaller element
+        for (j = i + 1; j < count; j++) {
+            if (queue[j].burst_time < queue[min_idx].burst_time) {
+                min_idx = j;
+            }
+        }
+
+        // Changes positions
+        if (min_idx != i) {
+            Process temp = queue[min_idx];
+            queue[min_idx] = queue[i];
+            queue[i] = temp;
         }
     }
 }
