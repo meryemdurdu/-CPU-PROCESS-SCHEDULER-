@@ -22,7 +22,9 @@ void read_input_file(const char *filename, Process *processes, int *num_processe
 void assign_processes(Process *processes, int num_processes, FILE *output_file);
 void print_cpu_queues(Process *processes, int num_processes);
 
+//Helper function prototypes
 void sort_processes_by_burst_time(Process *queue, int count);
+void round_robin(Process *queue, int count, int quantum, FILE *output_file);
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
@@ -78,22 +80,54 @@ void read_input_file(const char *filename, Process *processes, int *num_processe
 
 // Assign processes to CPUs
 void assign_processes(Process *processes, int num_processes, FILE *output_file) {
-    // Assign processes to CPU-1 (FCFS)
+
+    // Temporary arrays to hold processes for different queues
+    Process queueCPU1[MAX_PROCESSES];
+    int countCPU1 = 0;
+    Process queueCPU2_Priority1[MAX_PROCESSES];
+    int countCPU2_P1 = 0;
+    Process queueCPU2_Priority2[MAX_PROCESSES];
+    int countCPU2_P2 = 0;
+    Process queueCPU2_Priority3[MAX_PROCESSES];
+    int countCPU2_P3 = 0;
+
+    // Separate processes into different queues
     for (int i = 0; i < num_processes; i++) {
         if (processes[i].priority == 0 && processes[i].ram <= RAM_SIZE / 4) {
-            fprintf(output_file, "Process %s is queued to be assigned to CPU-1.\n", processes[i].name);
-            // Assign to CPU-1
-            fprintf(output_file, "Process %s is assigned to CPU-1.\n", processes[i].name);
-            // Process execution...
-            fprintf(output_file, "Process %s is completed and terminated.\n", processes[i].name);
-        } else {
-            // Assign to CPU-2
-            fprintf(output_file, "Process %s is queued to be assigned to CPU-2.\n", processes[i].name);
-            // Assign to appropriate queue and execute based on priority and scheduling algorithm
-            // Process execution...
-            fprintf(output_file, "Process %s is completed and terminated.\n", processes[i].name);
+            queueCPU1[countCPU1++] = processes[i];
+        } else if (processes[i].priority == 1) {
+            queueCPU2_Priority1[countCPU2_P1++] = processes[i];
+        } else if (processes[i].priority == 2) {
+            queueCPU2_Priority2[countCPU2_P2++] = processes[i];
+        } else if (processes[i].priority == 3) {
+            queueCPU2_Priority3[countCPU2_P3++] = processes[i];
         }
     }
+
+// Handle CPU-1 (FCFS)
+    fprintf(output_file, "CPU-1 Queue Processing:\n");
+    for (int i = 0; i < countCPU1; i++) {
+        fprintf(output_file, "Process %s is assigned to CPU-1.\n", queueCPU1[i].name);
+        // Process execution...
+        fprintf(output_file, "Process %s is completed and terminated.\n", queueCPU1[i].name);
+    }
+
+    // Handle CPU-2 Priority-1 (SJF)
+    sort_processes_by_burst_time(queueCPU2_Priority1, countCPU2_P1);
+    fprintf(output_file, "CPU-2 Priority-1 Queue Processing (SJF):\n");
+    for (int i = 0; i < countCPU2_P1; i++) {
+        fprintf(output_file, "Process %s is assigned to CPU-2.\n", queueCPU2_Priority1[i].name);
+        // Process execution...
+        fprintf(output_file, "Process %s is completed and terminated.\n", queueCPU2_Priority1[i].name);
+    }
+
+    // Handle CPU-2 Priority-2 (RR with quantum 8)
+    fprintf(output_file, "CPU-2 Priority-2 Queue Processing (RR-q8):\n");
+    round_robin(queueCPU2_Priority2, countCPU2_P2, CPU2_QUANTUM_MEDIUM, output_file);
+
+    // Handle CPU-2 Priority-3 (RR with quantum 16)
+    fprintf(output_file, "CPU-2 Priority-3 Queue Processing (RR-q16):\n");
+    round_robin(queueCPU2_Priority3, countCPU2_P3, CPU2_QUANTUM_LOW, output_file);
 }
 
 //Helper function to sort processes by burst_time for SJF scheduling
@@ -117,6 +151,41 @@ void sort_processes_by_burst_time(Process *queue, int count) {
             Process temp = queue[min_idx];
             queue[min_idx] = queue[i];
             queue[i] = temp;
+        }
+    }
+}
+
+// Helper function to handle Round Robin scheduling
+void round_robin(Process *queue, int count, int quantum, FILE *output_file) {
+    int time_remaining[count];  // Array to store the remaining burst time of each process
+
+    // Initialize remaining times for each process
+    for (int i = 0; i < count; i++) {
+        time_remaining[i] = queue[i].burst_time;
+    }
+
+    int time = 0; // Current time marker, not necessary but useful for understanding the timeline
+
+    // Process the queue until all jobs are completed
+    while (1) {
+        int done = 1; // Flag to check if all processes are completed
+        for (int i = 0; i < count; i++) {
+            if (time_remaining[i] > 0) {
+                done = 0; // There's still a process which is not done
+                if (time_remaining[i] > quantum) {
+                    time += quantum;
+                    time_remaining[i] -= quantum;
+                    fprintf(output_file, "Process %s runs for %d units.\n", queue[i].name, quantum);
+                } else {
+                    time += time_remaining[i];
+                    fprintf(output_file, "Process %s runs for %d units, completing its execution.\n", queue[i].name, time_remaining[i]);
+                    time_remaining[i] = 0;
+                    fprintf(output_file, "Process %s is completed and terminated.\n", queue[i].name);
+                }
+            }
+        }
+        if (done == 1) {
+            break; // Exit loop if all processes are completed
         }
     }
 }
