@@ -17,12 +17,22 @@ typedef struct {
     int cpu_rate;
 } Process;
 
+Process queueCPU1[MAX_PROCESSES];
+int countCPU1 = 0;
+Process queueCPU2_Priority1[MAX_PROCESSES];
+int countCPU2_P1 = 0;
+Process queueCPU2_Priority2[MAX_PROCESSES];
+int countCPU2_P2 = 0;
+Process queueCPU2_Priority3[MAX_PROCESSES];
+int countCPU2_P3 = 0;
+
 // Function prototypes
 void read_input_file(const char *filename, Process *processes, int *num_processes);
 void assign_processes(Process *processes, int num_processes, FILE *output_file);
 void print_cpu_queues(Process *processes, int num_processes);
+void check_ram_sizes(Process *processes, int num_processes);
 
-//Helper function prototypes
+// Helper function prototypes
 void sort_processes_by_burst_time(Process *queue, int count);
 void round_robin(Process *queue, int count, int quantum, FILE *output_file);
 
@@ -31,12 +41,15 @@ int main(int argc, char *argv[]) {
         printf("Usage: %s input.txt\n", argv[0]);
         return 1;
     }
-
+    
     Process processes[MAX_PROCESSES];
     int num_processes = 0;
-
+    
     // Read input file
     read_input_file(argv[1], processes, &num_processes);
+
+    //Checks ram sizes
+    check_ram_sizes(processes, num_processes);
 
     // Open output file
     FILE *output_file = fopen("output.txt", "w");
@@ -74,23 +87,21 @@ void read_input_file(const char *filename, Process *processes, int *num_processe
                   &processes[*num_processes].cpu_rate) != EOF) {
         (*num_processes)++;
     }
-
     fclose(file);
+}
+
+void check_ram_sizes(Process *processes, int num_processes) {
+    for (int i = 0; i < num_processes; i++) {
+        if (processes[i].ram > RAM_SIZE) {
+            printf("Error: Process %s requires more RAM (%d) than available (%d).\n", processes[i].name, processes[i].ram, RAM_SIZE);
+            exit(1); // Terminate the program if any process exceeds RAM_SIZE
+        }
+    }
 }
 
 // Assign processes to CPUs
 void assign_processes(Process *processes, int num_processes, FILE *output_file) {
-
-    // Temporary arrays to hold processes for different queues
-    Process queueCPU1[MAX_PROCESSES];
-    int countCPU1 = 0;
-    Process queueCPU2_Priority1[MAX_PROCESSES];
-    int countCPU2_P1 = 0;
-    Process queueCPU2_Priority2[MAX_PROCESSES];
-    int countCPU2_P2 = 0;
-    Process queueCPU2_Priority3[MAX_PROCESSES];
-    int countCPU2_P3 = 0;
-
+    
     // Separate processes into different queues
     for (int i = 0; i < num_processes; i++) {
         if (processes[i].priority == 0 && processes[i].ram <= RAM_SIZE / 4) {
@@ -104,7 +115,7 @@ void assign_processes(Process *processes, int num_processes, FILE *output_file) 
         }
     }
 
-// Handle CPU-1 (FCFS)
+    // Handle CPU-1 (FCFS)
     fprintf(output_file, "CPU-1 Queue Processing:\n");
     for (int i = 0; i < countCPU1; i++) {
         fprintf(output_file, "Process %s is assigned to CPU-1.\n", queueCPU1[i].name);
@@ -130,7 +141,7 @@ void assign_processes(Process *processes, int num_processes, FILE *output_file) 
     round_robin(queueCPU2_Priority3, countCPU2_P3, CPU2_QUANTUM_LOW, output_file);
 }
 
-//Helper function to sort processes by burst_time for SJF scheduling
+// Helper function to sort processes by burst_time for SJF scheduling
 void sort_processes_by_burst_time(Process *queue, int count) {
     int i, j, min_idx;
 
@@ -176,6 +187,11 @@ void round_robin(Process *queue, int count, int quantum, FILE *output_file) {
                     time += quantum;
                     time_remaining[i] -= quantum;
                     fprintf(output_file, "Process %s runs for %d units.\n", queue[i].name, quantum);
+                    	if(quantum == 8){
+      				        queueCPU2_Priority2[countCPU2_P2++] = queue[i];
+        		        } else if (quantum==16) {
+            			    queueCPU2_Priority3[countCPU2_P3++] = queue[i];
+        		        }
                 } else {
                     time += time_remaining[i];
                     fprintf(output_file, "Process %s runs for %d units, completing its execution.\n", queue[i].name, time_remaining[i]);
@@ -188,6 +204,17 @@ void round_robin(Process *queue, int count, int quantum, FILE *output_file) {
             break; // Exit loop if all processes are completed
         }
     }
+}
+void printProcess(Process p) {
+    printf("%s-",p.name);
+}
+
+void printQueue(Process queue[], int count, const char* queueName) {
+    printf("%s ", queueName);
+    for (int i = 0; i < count; i++) {
+        printProcess(queue[i]);
+    }
+    printf("\n");
 }
 
 // Print CPU queues
@@ -208,19 +235,6 @@ void print_cpu_queues(Process *processes, int num_processes) {
     }
     printf("\n");
 
-    printf("CPU-2 que3(priority-2) (RR-q8)→ ");
-    for (int i = 0; i < num_processes; i++) {
-        if (processes[i].priority == 2) {
-            printf("%s-", processes[i].name);
-        }
-    }
-    printf("\n");
-
-    printf("CPU-2 que4(priority-3) (RR-q16)→ ");
-    for (int i = 0; i < num_processes; i++) {
-        if (processes[i].priority == 3) {
-            printf("%s-", processes[i].name);
-        }
-    }
-    printf("\n");
+    printQueue(queueCPU2_Priority2, countCPU2_P2, "queueCPU2_Priority2");    
+    printQueue(queueCPU2_Priority3, countCPU2_P3, "queueCPU2_Priority3");
 }
